@@ -1,4 +1,4 @@
-full_hash=e6687140e285ff92c4632673d1ecb6935b00f6cc
-short_hash=e668714
-message=feat(ui): enable English translation overlay
-date=2026-10-02 13:46:01 +0700
+full_hash=4f1de6ad46f739be96a00c1309c5a32c44d79704
+short_hash=4f1de6a
+message=chore(sync): record upstream baseline
+date=2026-10-02 13:46:37 +0700
