@@ -1,4 +1,4 @@
-full_hash=4f1de6ad46f739be96a00c1309c5a32c44d79704
-short_hash=4f1de6a
-message=chore(sync): record upstream baseline
-date=2026-10-02 13:46:37 +0700
+full_hash=1e5b95f585a192cb49d1ae4c26112f019b1e9e47
+short_hash=1e5b95f
+message=ci: sync upstream while preserving English UI
+date=2026-10-02 13:47:05 +0700
