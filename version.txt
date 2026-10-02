@@ -1,4 +1,4 @@
-full_hash=86363813a3175c59fbbde0cffa0ceb5b55db7fc5
-short_hash=8636381
-message=feat(ui): add conflict-resistant English translation overlay
-date=2026-10-02 13:45:35 +0700
+full_hash=e6687140e285ff92c4632673d1ecb6935b00f6cc
+short_hash=e668714
+message=feat(ui): enable English translation overlay
+date=2026-10-02 13:46:01 +0700
