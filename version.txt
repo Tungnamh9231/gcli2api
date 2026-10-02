@@ -1,4 +1,4 @@
-full_hash=1e5b95f585a192cb49d1ae4c26112f019b1e9e47
-short_hash=1e5b95f
-message=ci: sync upstream while preserving English UI
-date=2026-10-02 13:47:05 +0700
+full_hash=1d6eb6d40d4d707abc4743061f0c5ea6745d8545
+short_hash=1d6eb6d
+message=fix(ui): preserve update-button state sentinel
+date=2026-10-02 13:48:22 +0700
