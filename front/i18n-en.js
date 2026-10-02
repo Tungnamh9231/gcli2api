@@ -675,6 +675,18 @@
             var parent = node.parentElement;
             if (!parent || shouldSkipElement(parent)) return;
             var oldText = node.nodeValue;
+
+            // common.js uses this exact Chinese string as an internal state sentinel.
+            // Keep the DOM value untouched so its comparison still works, while CSS
+            // presents the English label to the user.
+            if (parent.id === "checkUpdateBtn" && oldText.trim() === "检查中...") {
+                parent.setAttribute("data-i18n-checking", "1");
+                return;
+            }
+            if (parent.id === "checkUpdateBtn") {
+                parent.removeAttribute("data-i18n-checking");
+            }
+
             var newText = translateText(oldText);
             if (newText !== oldText) node.nodeValue = newText;
             return;
@@ -734,7 +746,11 @@
         if (document.getElementById("gcli2api-english-ui-style")) return;
         var style = document.createElement("style");
         style.id = "gcli2api-english-ui-style";
-        style.textContent = ".env-locked::after{content:\"🔒 Locked by environment variable\" !important;}";
+        style.textContent = [
+            ".env-locked::after{content:\"🔒 Locked by environment variable\" !important;}",
+            "#checkUpdateBtn[data-i18n-checking=\"1\"]{font-size:0 !important;}",
+            "#checkUpdateBtn[data-i18n-checking=\"1\"]::after{content:\"Checking...\";font-size:12px;}"
+        ].join("");
         document.head.appendChild(style);
     }
 
