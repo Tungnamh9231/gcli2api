@@ -1,4 +1,4 @@
-full_hash=d8f4a59c873c350b659ca21b5ab5959ab105fde7
-short_hash=d8f4a59
-message=Update utils.py
-date=2026-09-27 16:00:09 +0800
+full_hash=86363813a3175c59fbbde0cffa0ceb5b55db7fc5
+short_hash=8636381
+message=feat(ui): add conflict-resistant English translation overlay
+date=2026-10-02 13:45:35 +0700
