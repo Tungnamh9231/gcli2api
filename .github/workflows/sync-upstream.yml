@@ -1,0 +1,101 @@
+name: Sync upstream and preserve English UI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-master
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/su-kaka/gcli2api.git || true
+          git fetch --no-tags upstream master
+
+      - name: Apply upstream snapshot without touching fork-only translation files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upstream_sha="$(git rev-parse upstream/master)"
+          last_sha="$(cat .github/upstream-sha 2>/dev/null || true)"
+
+          if [[ "$last_sha" == "$upstream_sha" ]]; then
+            echo "Already synced to $upstream_sha"
+            exit 0
+          fi
+
+          if [[ -n "$last_sha" ]] && git cat-file -e "$last_sha^{commit}" 2>/dev/null; then
+            git diff --name-only --diff-filter=D "$last_sha" "$upstream_sha" |
+              while IFS= read -r path; do
+                [[ -z "$path" ]] && continue
+                git rm -f --ignore-unmatch -- "$path"
+              done
+          fi
+
+          # Replace every path currently tracked by upstream with the upstream version.
+          # Fork-only files (i18n overlay, sync workflow, baseline marker) are untouched.
+          git checkout upstream/master -- .
+
+          # Re-apply the minimal English UI hook after upstream HTML refreshes.
+          python - <<'PY'
+          from pathlib import Path
+
+          for filename in ("front/control_panel.html", "front/control_panel_mobile.html"):
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+
+              text = text.replace('<html lang="zh-CN">', '<html lang="en">')
+
+              common = '    <script src="./front/common.js"></script>'
+              i18n = '    <script src="./front/i18n-en.js"></script>'
+
+              if i18n not in text:
+                  if common not in text:
+                      raise SystemExit(f"Cannot find common.js script marker in {filename}")
+                  text = text.replace(common, common + "\n" + i18n)
+
+              path.write_text(text, encoding="utf-8")
+          PY
+
+          printf '%s\n' "$upstream_sha" > .github/upstream-sha
+
+      - name: Validate syntax
+        run: |
+          python -m compileall -q .
+          node --check front/common.js
+          node --check front/i18n-en.js
+
+      - name: Commit directly to master
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git add -A
+          upstream_sha="$(cat .github/upstream-sha)"
+          git commit -m "chore(sync): update from upstream ${upstream_sha:0:12} [skip ci]"
+          git push origin HEAD:master
