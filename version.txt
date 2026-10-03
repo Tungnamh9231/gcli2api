@@ -1,4 +1,4 @@
-full_hash=1d6eb6d40d4d707abc4743061f0c5ea6745d8545
-short_hash=1d6eb6d
-message=fix(ui): preserve update-button state sentinel
-date=2026-10-02 13:48:22 +0700
+full_hash=fb6f2d5e8359dc788f00e13789f1453b75fe7ad8
+short_hash=fb6f2d5
+message=Update antigravity_fix.py
+date=2026-10-04 00:01:43 +0800
