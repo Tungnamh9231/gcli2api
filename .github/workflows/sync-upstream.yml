@@ -40,9 +40,15 @@ jobs:
           upstream_sha="$(git rev-parse upstream/master)"
           last_sha="$(cat .github/upstream-sha 2>/dev/null || true)"
 
-          if [[ "$last_sha" == "$upstream_sha" ]]; then
+          if [[ "$last_sha" == "$upstream_sha" ]] && git merge-base --is-ancestor "$upstream_sha" HEAD; then
             echo "Already synced to $upstream_sha"
             exit 0
+          fi
+
+          # Record upstream in the commit ancestry, not just the file snapshot.
+          # File content is synchronized below while retaining fork-only files.
+          if ! git merge-base --is-ancestor "$upstream_sha" HEAD; then
+            git merge --no-ff --no-commit -s ours upstream/master
           fi
 
           if [[ -n "$last_sha" ]] && git cat-file -e "$last_sha^{commit}" 2>/dev/null; then
