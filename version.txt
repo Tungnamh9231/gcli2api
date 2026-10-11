@@ -1,4 +1,4 @@
-full_hash=e5c198805b2adced88c70a6b292e2556da9e5fd7
-short_hash=e5c1988
-message=Restore Gemini assistant prefill on master and preserve it during upstream sync
-date=2026-10-11 19:58:44 +0700
+full_hash=09622b6e17a085cf44cb00bd39dae6d1a34a5992
+short_hash=09622b6
+message=Revert Gemini assistant prefill restoration (e5c1988)
+date=2026-10-11 20:13:09 +0700
