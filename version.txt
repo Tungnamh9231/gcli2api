@@ -1,4 +1,4 @@
-full_hash=77dce5f3d12c92f9aca70b37c87bf60fec194a83
-short_hash=77dce5f
-message=Merge upstream master and fix future fork sync ancestry
-date=2026-10-11 17:04:21 +0700
+full_hash=e5c198805b2adced88c70a6b292e2556da9e5fd7
+short_hash=e5c1988
+message=Restore Gemini assistant prefill on master and preserve it during upstream sync
+date=2026-10-11 19:58:44 +0700
