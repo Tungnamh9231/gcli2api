@@ -63,6 +63,9 @@ jobs:
           # Fork-only files (i18n overlay, sync workflow, baseline marker) are untouched.
           git checkout upstream/master -- .
 
+          # Re-apply the fork's Gemini assistant prefill behavior after each upstream sync.
+          python .github/scripts/restore_antigravity_prefill.py
+
           # Re-apply the minimal English UI hook after upstream HTML refreshes.
           python - <<'PY'
           from pathlib import Path

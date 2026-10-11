@@ -3,7 +3,7 @@ Antigravity Format Utilities - 独立的 Antigravity 请求处理和转换工具
 
 设计要点:
   * 每个模型家族在 resolve_profile 里有独立的一行配置 (后端模型 ID / 思考方式)
-  * 所有模型统一禁用预填充 (请求不能以 model 消息结尾)
+  * Fork: Gemini assistant prefill restored where legacy behavior allowed it
   * 不修改调用方传入的 request (generationConfig / thinkingConfig / contents 均先复制)
 ────────────────────────────────────────────────────────────────
 """
@@ -818,10 +818,15 @@ async def normalize_antigravity_request(
     if "contents" in result:
         contents = _clean_contents(result["contents"], upstream)
 
-        # 所有模型统一禁用预填充
-        contents, removed = _strip_trailing_model_turns(contents)
-        if removed:
-            print(f"[ANTIGRAVITY] {upstream} 不支持预填充，移除了 {removed} 条末尾 model 消息", flush=True)
+        # Fork: restore Gemini assistant prefill (upstream may still reject HTTP 400).
+        # Claude and Gemini 3.5-3.8 Flash retain upstream's no-prefill handling.
+        no_prefill = profile.family == "claude" or bool(
+            re.search(r"gemini-3\.[5-8]-flash", model.lower())
+        )
+        if no_prefill:
+            contents, removed = _strip_trailing_model_turns(contents)
+            if removed:
+                print(f"[ANTIGRAVITY] {upstream} 不支持预填充，移除了 {removed} 条末尾 model 消息", flush=True)
 
         if profile.family == "claude":
             contents = _prepare_claude_history(contents, generation_config)
