@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from config import get_allow_prefill
+import config
 from src.converter.thoughtSignature_fix import SKIP_THOUGHT_SIGNATURE_VALIDATOR
 
 # ==================== 常量配置 ====================
@@ -827,7 +827,7 @@ async def normalize_antigravity_request(
 
     # ========== 2. contents ==========
     if "contents" in result:
-        allow_prefill = await get_allow_prefill()
+        allow_prefill = await config.get_allow_prefill()
         contents = _clean_contents(
             result["contents"], upstream, preserve_final_model_text=allow_prefill
         )
