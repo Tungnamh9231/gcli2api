@@ -230,10 +230,16 @@ def is_thinking_model(model_name: str) -> bool:
 
 # ==================== 请求体清理 ====================
 
-def _clean_contents(contents: List[Any]) -> List[Any]:
-    """过滤空 part、修正 text 字段类型、丢弃没有有效 part 的 content"""
+def _clean_contents(contents: List[Any], preserve_final_model_text: bool = False) -> List[Any]:
+    """过滤空 part、修正 text 字段类型；可保留最终 model prefill 的末尾空格"""
     cleaned_contents = []
-    for content in contents:
+    for index, content in enumerate(contents):
+        is_final_model_prefill = (
+            preserve_final_model_text
+            and index == len(contents) - 1
+            and isinstance(content, dict)
+            and content.get("role") == "model"
+        )
         if not (isinstance(content, dict) and "parts" in content):
             cleaned_contents.append(content)
             continue
@@ -260,7 +266,7 @@ def _clean_contents(contents: List[Any]) -> List[Any]:
                     log.warning(f"[GEMINI_FIX] text 字段是列表，自动合并: {text_value}")
                     part["text"] = " ".join(str(t) for t in text_value if t)
                 elif isinstance(text_value, str):
-                    part["text"] = text_value.rstrip()
+                    part["text"] = text_value if is_final_model_prefill else text_value.rstrip()
                 else:
                     log.warning(f"[GEMINI_FIX] text 字段类型异常 ({type(text_value)}), 转为字符串: {text_value}")
                     part["text"] = str(text_value)
@@ -308,7 +314,7 @@ async def normalize_gemini_request(
     Returns:
         规范化后的请求
     """
-    from config import get_return_thoughts_to_frontend
+    from config import get_allow_prefill, get_return_thoughts_to_frontend
 
     result = request.copy()
     model = result.get("model", "")
@@ -366,8 +372,9 @@ async def normalize_gemini_request(
 
     # contents: 先清理, 再处理预填充 (清理后可能产生新的末尾 model 消息)
     if "contents" in result:
-        contents = _clean_contents(result["contents"])
-        if profile and profile.no_prefill:
+        allow_prefill = await get_allow_prefill()
+        contents = _clean_contents(result["contents"], preserve_final_model_text=allow_prefill)
+        if profile and profile.no_prefill and not allow_prefill:
             contents, removed = _strip_trailing_model_turns(contents)
             if removed:
                 log.warning(f"[GEMINI_FIX] {base_model} 不支持预填充，移除了 {removed} 条末尾 model 消息")

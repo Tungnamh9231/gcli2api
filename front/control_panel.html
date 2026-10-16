@@ -2152,6 +2152,15 @@
 
                             <div class="form-group">
                                 <label>
+                                    <input type="checkbox" id="allowPrefill" class="config-checkbox" />
+                                    允许预填充 (Allow Prefill)
+                                </label>
+                                <small class="config-note">启用后允许将末尾的 assistant/model 预填充消息发送到上游；关闭时保持原有处理方式（部分模型会移除预填充） <span style="color: #28a745;">✓ 支持热更新</span></small>
+                                <small class="config-note">开启可能导致部分模型返回 400 错误。</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
                                     <input type="checkbox" id="returnThoughtsToFrontend" class="config-checkbox" />
                                     返回思维链到前端
                                 </label>

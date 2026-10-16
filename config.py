@@ -37,6 +37,7 @@ ENV_MAPPINGS = {
     "RETRY_429_INTERVAL": "retry_429_interval",
     "ANTI_TRUNCATION_MAX_ATTEMPTS": "anti_truncation_max_attempts",
     "COMPATIBILITY_MODE": "compatibility_mode_enabled",
+    "ALLOW_PREFILL": "allow_prefill",
     "RETURN_THOUGHTS_TO_FRONTEND": "return_thoughts_to_frontend",
     "ANTIGRAVITY_STREAM2NOSTREAM": "antigravity_stream2nostream",
     "ANTIGRAVITY_SWITCH_CREDENTIAL": "antigravity_switch_credential_enabled",
@@ -299,6 +300,20 @@ async def get_code_assist_endpoint() -> str:
             "code_assist_endpoint", "https://cloudcode-pa.googleapis.com", "CODE_ASSIST_ENDPOINT"
         )
     )
+
+
+async def get_allow_prefill() -> bool:
+    """Allow trailing assistant/model prefill turns to reach upstream APIs.
+
+    Environment variable: ALLOW_PREFILL
+    Database config key: allow_prefill
+    Default: False (preserves existing model-specific prefill filtering)
+    """
+    env_value = os.getenv("ALLOW_PREFILL")
+    if env_value is not None:
+        return env_value.lower() in ("true", "1", "yes", "on")
+
+    return bool(await get_config_value("allow_prefill", False))
 
 
 async def get_compatibility_mode_enabled() -> bool:
