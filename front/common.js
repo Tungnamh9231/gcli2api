@@ -2681,6 +2681,7 @@ function populateConfigForm() {
     setConfigField('retry429Interval', c.retry_429_interval || 0.1);
 
     document.getElementById('compatibilityModeEnabled').checked = Boolean(c.compatibility_mode_enabled);
+    document.getElementById('allowPrefill').checked = Boolean(c.allow_prefill);
     document.getElementById('returnThoughtsToFrontend').checked = Boolean(c.return_thoughts_to_frontend !== false);
     document.getElementById('antigravityStream2nostream').checked = Boolean(c.antigravity_stream2nostream !== false);
     document.getElementById('antigravitySwitchCredentialEnabled').checked = Boolean(c.antigravity_switch_credential_enabled);
@@ -2735,6 +2736,7 @@ async function saveConfig() {
             retry_429_max_retries: getInt('retry429MaxRetries', 20),
             retry_429_interval: getFloat('retry429Interval', 0.1),
             compatibility_mode_enabled: getChecked('compatibilityModeEnabled'),
+            allow_prefill: getChecked('allowPrefill'),
             return_thoughts_to_frontend: getChecked('returnThoughtsToFrontend'),
             antigravity_stream2nostream: getChecked('antigravityStream2nostream'),
             antigravity_switch_credential_enabled: getChecked('antigravitySwitchCredentialEnabled'),

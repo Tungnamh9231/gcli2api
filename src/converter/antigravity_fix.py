@@ -3,7 +3,7 @@ Antigravity Format Utilities - 独立的 Antigravity 请求处理和转换工具
 
 设计要点:
   * 每个模型家族在 resolve_profile 里有独立的一行配置 (后端模型 ID / 思考方式)
-  * 所有模型禁用预填充 (profile.no_prefill 恒为 True)
+  * 默认禁用预填充 (profile.no_prefill 恒为 True)，可通过 Allow Prefill 覆盖
   * 不修改调用方传入的 request (generationConfig / thinkingConfig / contents 均先复制)
 ────────────────────────────────────────────────────────────────
 按项目要求:
@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from config import get_allow_prefill
 from src.converter.thoughtSignature_fix import SKIP_THOUGHT_SIGNATURE_VALIDATOR
 
 # ==================== 常量配置 ====================
@@ -669,10 +670,18 @@ def _apply_thinking(profile: ModelProfile, generation_config: Dict[str, Any], re
 
 # ==================== contents 处理 ====================
 
-def _clean_contents(contents: List[Any], model_name: str) -> List[Any]:
-    """过滤空 part、规范 thoughtSignature、修正 text 字段类型、丢弃没有有效 part 的 content"""
+def _clean_contents(
+    contents: List[Any], model_name: str, preserve_final_model_text: bool = False
+) -> List[Any]:
+    """过滤空 part、规范 thoughtSignature，并可保留末尾 model prefill 的空格"""
     cleaned_contents = []
-    for content in contents:
+    for index, content in enumerate(contents):
+        is_final_model_prefill = (
+            preserve_final_model_text
+            and index == len(contents) - 1
+            and isinstance(content, dict)
+            and content.get("role") == "model"
+        )
         if not (isinstance(content, dict) and "parts" in content):
             cleaned_contents.append(content)
             continue
@@ -701,7 +710,7 @@ def _clean_contents(contents: List[Any], model_name: str) -> List[Any]:
                             text_parts.append(str(t))
                     part["text"] = " ".join(text_parts)
                 elif isinstance(text_value, str):
-                    part["text"] = text_value.rstrip()
+                    part["text"] = text_value if is_final_model_prefill else text_value.rstrip()
                 else:
                     print(f"[ANTIGRAVITY_FIX] text 字段类型异常 ({type(text_value)}), 转为字符串: {text_value}", flush=True)
                     part["text"] = str(text_value)
@@ -818,9 +827,12 @@ async def normalize_antigravity_request(
 
     # ========== 2. contents ==========
     if "contents" in result:
-        contents = _clean_contents(result["contents"], upstream)
+        allow_prefill = await get_allow_prefill()
+        contents = _clean_contents(
+            result["contents"], upstream, preserve_final_model_text=allow_prefill
+        )
 
-        if profile.no_prefill:
+        if profile.no_prefill and not allow_prefill:
             contents, removed = _strip_trailing_model_turns(contents)
             if removed:
                 print(f"[ANTIGRAVITY] {upstream} 禁用预填充，移除了 {removed} 条末尾 model 消息", flush=True)

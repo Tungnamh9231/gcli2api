@@ -52,6 +52,7 @@ async def get_config(token: str = Depends(verify_panel_token)):
 
         # 兼容性配置
         current_config["compatibility_mode_enabled"] = await config.get_compatibility_mode_enabled()
+        current_config["allow_prefill"] = await config.get_allow_prefill()
 
         # 思维链返回配置
         current_config["return_thoughts_to_frontend"] = await config.get_return_thoughts_to_frontend()
@@ -134,6 +135,10 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
         if "compatibility_mode_enabled" in new_config:
             if not isinstance(new_config["compatibility_mode_enabled"], bool):
                 raise HTTPException(status_code=400, detail="兼容性模式开关必须是布尔值")
+
+        if "allow_prefill" in new_config:
+            if not isinstance(new_config["allow_prefill"], bool):
+                raise HTTPException(status_code=400, detail="Allow Prefill 开关必须是布尔值")
 
         if "return_thoughts_to_frontend" in new_config:
             if not isinstance(new_config["return_thoughts_to_frontend"], bool):
