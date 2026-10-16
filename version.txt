@@ -1,4 +1,4 @@
-full_hash=c597643c1aba49a53493d75734d86bab54f9aae1
-short_hash=c597643
-message=Update antigravity_fix.py
-date=2026-10-16 10:32:23 +0800
+full_hash=9988f70361c2a289039be8747fd7d405fc145b6d
+short_hash=9988f70
+message=feat: add Allow Prefill toggle for GeminiCLI and Antigravity
+date=2026-10-16 23:01:36 +0700
