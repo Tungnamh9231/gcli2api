@@ -1,4 +1,4 @@
-full_hash=9988f70361c2a289039be8747fd7d405fc145b6d
-short_hash=9988f70
-message=feat: add Allow Prefill toggle for GeminiCLI and Antigravity
-date=2026-10-16 23:01:36 +0700
+full_hash=2b25c569956c9c837260c3bbdefc6c72a5368f6a
+short_hash=2b25c56
+message=fix: ensure Allow Prefill works and survives upstream sync
+date=2026-10-16 23:20:20 +0700
