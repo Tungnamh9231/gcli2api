@@ -2755,6 +2755,12 @@ async function saveConfig() {
 
         if (response.ok) {
             let message = '配置保存成功';
+            if (typeof data.effective_allow_prefill === 'boolean') {
+                message += `, Allow Prefill: ${data.effective_allow_prefill ? 'ON' : 'OFF'}`;
+                if (data.effective_allow_prefill !== config.allow_prefill) {
+                    message += ' (由环境变量锁定)';
+                }
+            }
 
             if (data.hot_updated && data.hot_updated.length > 0) {
                 message += `，以下配置已立即生效: ${data.hot_updated.join(', ')}`;

@@ -374,6 +374,8 @@ async def normalize_gemini_request(
     if "contents" in result:
         allow_prefill = await get_allow_prefill()
         contents = _clean_contents(result["contents"], preserve_final_model_text=allow_prefill)
+        if allow_prefill and contents and isinstance(contents[-1], dict) and contents[-1].get("role") == "model":
+            log.info(f"[GEMINI_FIX] Allow Prefill=ON, forwarding final model turn for {base_model}")
         if profile and profile.no_prefill and not allow_prefill:
             contents, removed = _strip_trailing_model_turns(contents)
             if removed:

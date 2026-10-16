@@ -84,6 +84,14 @@ jobs:
               path.write_text(text, encoding="utf-8")
           PY
 
+          # Restore the fork's Allow Prefill feature after replacing upstream-tracked files.
+          # If the patch no longer applies, fail the sync instead of silently dropping the feature.
+          if [[ ! -f .github/allow-prefill.patch ]]; then
+            echo "::error::Missing .github/allow-prefill.patch; refusing to discard Allow Prefill"
+            exit 1
+          fi
+          git apply --3way --whitespace=nowarn .github/allow-prefill.patch
+
           printf '%s\n' "$upstream_sha" > .github/upstream-sha
 
       - name: Validate syntax
