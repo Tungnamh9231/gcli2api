@@ -1,0 +1,337 @@
+diff --git a/.env.example b/.env.example
+index 0cd0388aa921ad74893424eae0bbb62407577ae0..379aeeaf2ab58c1293599de461641125a0a8b783 100644
+--- a/.env.example
++++ b/.env.example
+@@ -150,6 +150,10 @@ LOG_FILE=log.txt
+ # 高级功能配置
+ # ================================================================
+ 
++# 是否允许发送 assistant/model 预填充消息到上游（部分模型可能拒绝）
++# 默认: false；开启后控制面板的此项设置将被环境变量锁定
++# ALLOW_PREFILL=false
++
+ # 抗截断最大尝试次数
+ # 用于 "抗截断/" 前缀的模型
+ # 默认: 3
+diff --git a/config.py b/config.py
+index 31a089d67c1ec5ab6dc6c2c64ce0e0e229fab44a..23209687172155f4d7ab394ff121a0a883a665cf 100644
+--- a/config.py
++++ b/config.py
+@@ -37,6 +37,7 @@
+     "RETRY_429_INTERVAL": "retry_429_interval",
+     "ANTI_TRUNCATION_MAX_ATTEMPTS": "anti_truncation_max_attempts",
+     "COMPATIBILITY_MODE": "compatibility_mode_enabled",
++    "ALLOW_PREFILL": "allow_prefill",
+     "RETURN_THOUGHTS_TO_FRONTEND": "return_thoughts_to_frontend",
+     "ANTIGRAVITY_STREAM2NOSTREAM": "antigravity_stream2nostream",
+     "ANTIGRAVITY_SWITCH_CREDENTIAL": "antigravity_switch_credential_enabled",
+@@ -301,6 +302,20 @@ async def get_code_assist_endpoint() -> str:
+     )
+ 
+ 
++async def get_allow_prefill() -> bool:
++    """Allow trailing assistant/model prefill turns to reach upstream APIs.
++
++    Environment variable: ALLOW_PREFILL
++    Database config key: allow_prefill
++    Default: False (preserves existing model-specific prefill filtering)
++    """
++    env_value = os.getenv("ALLOW_PREFILL")
++    if env_value is not None:
++        return env_value.lower() in ("true", "1", "yes", "on")
++
++    return bool(await get_config_value("allow_prefill", False))
++
++
+ async def get_compatibility_mode_enabled() -> bool:
+     """
+     Get compatibility mode setting.
+diff --git a/front/common.js b/front/common.js
+index d04cd0cc39853a8d6ae96de2d6948b26a2ff3bc7..9bd1638c06a7cbcdf421af8f4fbc0c768d2b0b35 100644
+--- a/front/common.js
++++ b/front/common.js
+@@ -2681,6 +2681,7 @@ function populateConfigForm() {
+     setConfigField('retry429Interval', c.retry_429_interval || 0.1);
+ 
+     document.getElementById('compatibilityModeEnabled').checked = Boolean(c.compatibility_mode_enabled);
++    document.getElementById('allowPrefill').checked = Boolean(c.allow_prefill);
+     document.getElementById('returnThoughtsToFrontend').checked = Boolean(c.return_thoughts_to_frontend !== false);
+     document.getElementById('antigravityStream2nostream').checked = Boolean(c.antigravity_stream2nostream !== false);
+     document.getElementById('antigravitySwitchCredentialEnabled').checked = Boolean(c.antigravity_switch_credential_enabled);
+@@ -2735,6 +2736,7 @@ async function saveConfig() {
+             retry_429_max_retries: getInt('retry429MaxRetries', 20),
+             retry_429_interval: getFloat('retry429Interval', 0.1),
+             compatibility_mode_enabled: getChecked('compatibilityModeEnabled'),
++            allow_prefill: getChecked('allowPrefill'),
+             return_thoughts_to_frontend: getChecked('returnThoughtsToFrontend'),
+             antigravity_stream2nostream: getChecked('antigravityStream2nostream'),
+             antigravity_switch_credential_enabled: getChecked('antigravitySwitchCredentialEnabled'),
+@@ -2753,6 +2755,12 @@ async function saveConfig() {
+ 
+         if (response.ok) {
+             let message = '配置保存成功';
++            if (typeof data.effective_allow_prefill === 'boolean') {
++                message += `, Allow Prefill: ${data.effective_allow_prefill ? 'ON' : 'OFF'}`;
++                if (data.effective_allow_prefill !== config.allow_prefill) {
++                    message += ' (由环境变量锁定)';
++                }
++            }
+ 
+             if (data.hot_updated && data.hot_updated.length > 0) {
+                 message += `，以下配置已立即生效: ${data.hot_updated.join(', ')}`;
+diff --git a/front/control_panel.html b/front/control_panel.html
+index cf5d5f5b9c6e10580d4c7aadbdbf4a0c08e1ebbe..a432a2be0301591e75ac63f226e113f5eb9033e4 100644
+--- a/front/control_panel.html
++++ b/front/control_panel.html
+@@ -2150,6 +2150,15 @@ <h4>兼容性配置</h4>
+                                 </div>
+                             </div>
+ 
++                            <div class="form-group">
++                                <label>
++                                    <input type="checkbox" id="allowPrefill" class="config-checkbox" />
++                                    允许预填充 (Allow Prefill)
++                                </label>
++                                <small class="config-note">启用后允许将末尾的 assistant/model 预填充消息发送到上游；关闭时保持原有处理方式（部分模型会移除预填充） <span style="color: #28a745;">✓ 支持热更新</span></small>
++                                <small class="config-note">开启可能导致部分模型返回 400 错误。</small>
++                            </div>
++
+                             <div class="form-group">
+                                 <label>
+                                     <input type="checkbox" id="returnThoughtsToFrontend" class="config-checkbox" />
+@@ -2392,7 +2401,7 @@ <h4 style="margin-top: 0; color: #0c5460;">📞 联系我们</h4>
+     </div>
+ 
+     <!-- 引入公共JavaScript模块 -->
+-    <script src="./front/common.js"></script>
++    <script src="./front/common.js?v=allow-prefill-fix-20261016"></script>
+     <script src="./front/i18n-en.js"></script>
+ 
+ </body>
+diff --git a/front/control_panel_mobile.html b/front/control_panel_mobile.html
+index ab12e7f5e36a2b6b5c6fb5b54ae8d7199bedf8a7..454318768e432e673efde535d3b873699d5d074f 100644
+--- a/front/control_panel_mobile.html
++++ b/front/control_panel_mobile.html
+@@ -1877,6 +1877,15 @@ <h4 style="margin-top: 0; margin-bottom: 15px;">兼容性配置</h4>
+                                 </div>
+                             </div>
+ 
++                            <div class="form-group">
++                                <label style="display: flex; align-items: center; gap: 8px;">
++                                    <input type="checkbox" id="allowPrefill" style="width: auto; margin: 0;" />
++                                    允许预填充 (Allow Prefill)
++                                </label>
++                                <small style="display: block; color: #666; font-size: 12px; margin-top: 5px;">启用后允许将末尾的 assistant/model 预填充消息发送到上游；关闭时保持原有处理方式（部分模型会移除预填充） <span style="color: #28a745;">✓ 支持热更新</span></small>
++                                <small style="display: block; color: #666; font-size: 12px; margin-top: 5px;">开启可能导致部分模型返回 400 错误。</small>
++                            </div>
++
+                             <div class="form-group">
+                                 <label style="display: flex; align-items: center; gap: 8px;">
+                                     <input type="checkbox" id="returnThoughtsToFrontend"
+@@ -2117,7 +2126,7 @@ <h4 style="margin-top: 0; color: #0c5460;">📞 联系我们</h4>
+     </div>
+ 
+     <!-- 引入公共JavaScript模块 -->
+-    <script src="./front/common.js"></script>
++    <script src="./front/common.js?v=allow-prefill-fix-20261016"></script>
+     <script src="./front/i18n-en.js"></script>
+ </body>
+ 
+diff --git a/src/converter/antigravity_fix.py b/src/converter/antigravity_fix.py
+index ac81293741192d23620f745162c851fc9b988e36..df0b19e6e7e23d7323982efa374551c2c8023e1b 100644
+--- a/src/converter/antigravity_fix.py
++++ b/src/converter/antigravity_fix.py
+@@ -3,7 +3,7 @@
+ 
+ 设计要点:
+   * 每个模型家族在 resolve_profile 里有独立的一行配置 (后端模型 ID / 思考方式)
+-  * 所有模型禁用预填充 (profile.no_prefill 恒为 True)
++  * 默认禁用预填充 (profile.no_prefill 恒为 True)，可通过 Allow Prefill 覆盖
+   * 不修改调用方传入的 request (generationConfig / thinkingConfig / contents 均先复制)
+ ────────────────────────────────────────────────────────────────
+ 按项目要求:
+@@ -17,6 +17,7 @@
+ from datetime import datetime, timezone
+ from typing import Any, Dict, List, Optional, Tuple
+ 
++import config
+ from src.converter.thoughtSignature_fix import SKIP_THOUGHT_SIGNATURE_VALIDATOR
+ 
+ # ==================== 常量配置 ====================
+@@ -669,10 +670,18 @@ def _apply_thinking(profile: ModelProfile, generation_config: Dict[str, Any], re
+ 
+ # ==================== contents 处理 ====================
+ 
+-def _clean_contents(contents: List[Any], model_name: str) -> List[Any]:
+-    """过滤空 part、规范 thoughtSignature、修正 text 字段类型、丢弃没有有效 part 的 content"""
++def _clean_contents(
++    contents: List[Any], model_name: str, preserve_final_model_text: bool = False
++) -> List[Any]:
++    """过滤空 part、规范 thoughtSignature，并可保留末尾 model prefill 的空格"""
+     cleaned_contents = []
+-    for content in contents:
++    for index, content in enumerate(contents):
++        is_final_model_prefill = (
++            preserve_final_model_text
++            and index == len(contents) - 1
++            and isinstance(content, dict)
++            and content.get("role") == "model"
++        )
+         if not (isinstance(content, dict) and "parts" in content):
+             cleaned_contents.append(content)
+             continue
+@@ -701,7 +710,7 @@ def _clean_contents(contents: List[Any], model_name: str) -> List[Any]:
+                             text_parts.append(str(t))
+                     part["text"] = " ".join(text_parts)
+                 elif isinstance(text_value, str):
+-                    part["text"] = text_value.rstrip()
++                    part["text"] = text_value if is_final_model_prefill else text_value.rstrip()
+                 else:
+                     print(f"[ANTIGRAVITY_FIX] text 字段类型异常 ({type(text_value)}), 转为字符串: {text_value}", flush=True)
+                     part["text"] = str(text_value)
+@@ -818,9 +827,15 @@ async def normalize_antigravity_request(
+ 
+     # ========== 2. contents ==========
+     if "contents" in result:
+-        contents = _clean_contents(result["contents"], upstream)
++        allow_prefill = await config.get_allow_prefill()
++        contents = _clean_contents(
++            result["contents"], upstream, preserve_final_model_text=allow_prefill
++        )
++
++        if allow_prefill and contents and isinstance(contents[-1], dict) and contents[-1].get("role") == "model":
++            print(f"[ANTIGRAVITY] Allow Prefill=ON, forwarding final model turn for {upstream}", flush=True)
+ 
+-        if profile.no_prefill:
++        if profile.no_prefill and not allow_prefill:
+             contents, removed = _strip_trailing_model_turns(contents)
+             if removed:
+                 print(f"[ANTIGRAVITY] {upstream} 禁用预填充，移除了 {removed} 条末尾 model 消息", flush=True)
+diff --git a/src/converter/gemini_fix.py b/src/converter/gemini_fix.py
+index 5b316070933965db3ff64ec3b35557c2e1eb3d53..b44f23048f88446704043a56ede02079efc02cdb 100644
+--- a/src/converter/gemini_fix.py
++++ b/src/converter/gemini_fix.py
+@@ -230,10 +230,16 @@ def is_thinking_model(model_name: str) -> bool:
+ 
+ # ==================== 请求体清理 ====================
+ 
+-def _clean_contents(contents: List[Any]) -> List[Any]:
+-    """过滤空 part、修正 text 字段类型、丢弃没有有效 part 的 content"""
++def _clean_contents(contents: List[Any], preserve_final_model_text: bool = False) -> List[Any]:
++    """过滤空 part、修正 text 字段类型；可保留最终 model prefill 的末尾空格"""
+     cleaned_contents = []
+-    for content in contents:
++    for index, content in enumerate(contents):
++        is_final_model_prefill = (
++            preserve_final_model_text
++            and index == len(contents) - 1
++            and isinstance(content, dict)
++            and content.get("role") == "model"
++        )
+         if not (isinstance(content, dict) and "parts" in content):
+             cleaned_contents.append(content)
+             continue
+@@ -260,7 +266,7 @@ def _clean_contents(contents: List[Any]) -> List[Any]:
+                     log.warning(f"[GEMINI_FIX] text 字段是列表，自动合并: {text_value}")
+                     part["text"] = " ".join(str(t) for t in text_value if t)
+                 elif isinstance(text_value, str):
+-                    part["text"] = text_value.rstrip()
++                    part["text"] = text_value if is_final_model_prefill else text_value.rstrip()
+                 else:
+                     log.warning(f"[GEMINI_FIX] text 字段类型异常 ({type(text_value)}), 转为字符串: {text_value}")
+                     part["text"] = str(text_value)
+@@ -308,7 +314,7 @@ async def normalize_gemini_request(
+     Returns:
+         规范化后的请求
+     """
+-    from config import get_return_thoughts_to_frontend
++    from config import get_allow_prefill, get_return_thoughts_to_frontend
+ 
+     result = request.copy()
+     model = result.get("model", "")
+@@ -366,8 +372,11 @@ async def normalize_gemini_request(
+ 
+     # contents: 先清理, 再处理预填充 (清理后可能产生新的末尾 model 消息)
+     if "contents" in result:
+-        contents = _clean_contents(result["contents"])
+-        if profile and profile.no_prefill:
++        allow_prefill = await get_allow_prefill()
++        contents = _clean_contents(result["contents"], preserve_final_model_text=allow_prefill)
++        if allow_prefill and contents and isinstance(contents[-1], dict) and contents[-1].get("role") == "model":
++            log.info(f"[GEMINI_FIX] Allow Prefill=ON, forwarding final model turn for {base_model}")
++        if profile and profile.no_prefill and not allow_prefill:
+             contents, removed = _strip_trailing_model_turns(contents)
+             if removed:
+                 log.warning(f"[GEMINI_FIX] {base_model} 不支持预填充，移除了 {removed} 条末尾 model 消息")
+diff --git a/src/panel/config_routes.py b/src/panel/config_routes.py
+index dd1f489a012743bdedb684942d9adf7d0cb6d968..65433b087c3e5064fcb335be43908bc7bfdcc0ce 100644
+--- a/src/panel/config_routes.py
++++ b/src/panel/config_routes.py
+@@ -52,6 +52,7 @@ async def get_config(token: str = Depends(verify_panel_token)):
+ 
+         # 兼容性配置
+         current_config["compatibility_mode_enabled"] = await config.get_compatibility_mode_enabled()
++        current_config["allow_prefill"] = await config.get_allow_prefill()
+ 
+         # 思维链返回配置
+         current_config["return_thoughts_to_frontend"] = await config.get_return_thoughts_to_frontend()
+@@ -135,6 +136,10 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
+             if not isinstance(new_config["compatibility_mode_enabled"], bool):
+                 raise HTTPException(status_code=400, detail="兼容性模式开关必须是布尔值")
+ 
++        if "allow_prefill" in new_config:
++            if not isinstance(new_config["allow_prefill"], bool):
++                raise HTTPException(status_code=400, detail="Allow Prefill 开关必须是布尔值")
++
+         if "return_thoughts_to_frontend" in new_config:
+             if not isinstance(new_config["return_thoughts_to_frontend"], bool):
+                 raise HTTPException(status_code=400, detail="思维链返回开关必须是布尔值")
+@@ -192,13 +197,26 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
+         storage_adapter = await get_storage_adapter()
+         for key, value in new_config.items():
+             if key not in env_locked_keys:
+-                await storage_adapter.set_config(key, value)
++                saved = await storage_adapter.set_config(key, value)
++                if key == "allow_prefill" and not saved:
++                    raise HTTPException(status_code=500, detail="无法保存 Allow Prefill 设置")
+                 if key in ("password", "api_password", "panel_password"):
+                     log.debug(f"设置{key}字段为: {value}")
+ 
+         # 重新加载配置缓存（关键！）
+         await config.reload_config()
+ 
++        # 确认开关已经持久化并被当前进程读取，避免保存成功但实际仍按旧值处理
++        effective_allow_prefill = await config.get_allow_prefill()
++        if (
++            "allow_prefill" in new_config
++            and "allow_prefill" not in env_locked_keys
++            and effective_allow_prefill != new_config["allow_prefill"]
++        ):
++            raise HTTPException(
++                status_code=500, detail="Allow Prefill 配置未生效，请检查存储后端"
++            )
++
+         # 如果保活相关配置发生变化，立即重启保活服务
+         keepalive_keys = {"keepalive_url", "keepalive_interval"}
+         if keepalive_keys & set(new_config.keys()):
+@@ -218,6 +236,7 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
+         # 构建响应消息
+         response_data = {
+             "message": "配置保存成功",
++            "effective_allow_prefill": effective_allow_prefill,
+             "saved_config": {k: v for k, v in new_config.items() if k not in env_locked_keys},
+         }
+ 
+diff --git a/src/panel/root.py b/src/panel/root.py
+index b2139578d369a5c8e7c3fe0109e475bcc44b6343..ee3ebb0c71b88b86fb5947023332330cd9dc5ed0 100644
+--- a/src/panel/root.py
++++ b/src/panel/root.py
+@@ -27,7 +27,7 @@ async def serve_control_panel(request: Request):
+ 
+         with open(html_file_path, "r", encoding="utf-8") as f:
+             html_content = f.read()
+-        return HTMLResponse(content=html_content)
++        return HTMLResponse(content=html_content, headers={"Cache-Control": "no-store, max-age=0"})
+ 
+     except Exception as e:
+         log.error(f"加载控制面板页面失败: {e}")

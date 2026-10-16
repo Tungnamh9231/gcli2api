@@ -197,12 +197,25 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
         storage_adapter = await get_storage_adapter()
         for key, value in new_config.items():
             if key not in env_locked_keys:
-                await storage_adapter.set_config(key, value)
+                saved = await storage_adapter.set_config(key, value)
+                if key == "allow_prefill" and not saved:
+                    raise HTTPException(status_code=500, detail="无法保存 Allow Prefill 设置")
                 if key in ("password", "api_password", "panel_password"):
                     log.debug(f"设置{key}字段为: {value}")
 
         # 重新加载配置缓存（关键！）
         await config.reload_config()
+
+        # 确认开关已经持久化并被当前进程读取，避免保存成功但实际仍按旧值处理
+        effective_allow_prefill = await config.get_allow_prefill()
+        if (
+            "allow_prefill" in new_config
+            and "allow_prefill" not in env_locked_keys
+            and effective_allow_prefill != new_config["allow_prefill"]
+        ):
+            raise HTTPException(
+                status_code=500, detail="Allow Prefill 配置未生效，请检查存储后端"
+            )
 
         # 如果保活相关配置发生变化，立即重启保活服务
         keepalive_keys = {"keepalive_url", "keepalive_interval"}
@@ -223,6 +236,7 @@ async def save_config(request: ConfigSaveRequest, token: str = Depends(verify_pa
         # 构建响应消息
         response_data = {
             "message": "配置保存成功",
+            "effective_allow_prefill": effective_allow_prefill,
             "saved_config": {k: v for k, v in new_config.items() if k not in env_locked_keys},
         }
 
